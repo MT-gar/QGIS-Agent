@@ -71,15 +71,23 @@ pip.main(['install', 'langchain-core', 'litellm'])
 **2. 安装插件**
 
 ```bash
-# 方式一：下载 release zip，解压到 QGIS 插件目录
-# Windows: %APPDATA%\QGIS\QGIS4\profiles\default\python\plugins\qgis-agent\
-# Linux:   ~/.local/share/QGIS/QGIS4/profiles/default/python/plugins/qgis-agent/
-# macOS:   ~/Library/Application Support/QGIS/QGIS4/profiles/default/python/plugins/qgis-agent/
+# 方式一：直接使用仓库中打包好的 zip（推荐）
+# 1. 下载或 clone 本仓库
+git clone https://github.com/MT-gar/QGIS-Agent.git
 
-# 方式二：从源码安装
-git clone https://github.com/your-org/qgis-agent.git
-cd qgis-agent
-python qgis_agent/pack.py
+# 2. 打开 QGIS → 插件 → 管理并安装插件 → 从 ZIP 安装
+# 3. 选择文件：QGIS-Agent/qgis_agent/dist/qgis-agent.zip
+# 4. 点击"安装插件"
+
+# 方式二：手动解压到 QGIS 插件目录
+# 将 dist/qgis-agent.zip 解压到以下目录：
+# Windows: %APPDATA%\QGIS\QGIS3\profiles\default\python\plugins\qgis-agent\
+# Linux:   ~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/qgis-agent/
+# macOS:   ~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/qgis-agent/
+
+# 方式三：从源码重新打包
+cd qgis_agent
+python pack.py
 # 将生成的 dist/qgis-agent.zip 通过 QGIS 插件管理器安装
 ```
 
