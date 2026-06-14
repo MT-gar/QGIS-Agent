@@ -381,11 +381,60 @@ def create_qgis_tools(qgis_bridge, iface) -> List[BaseTool]:
         handle_tool_error=True,
     ))
 
-    # === Plugin tools (additional) ===
+    # === Plugin tools ===
+    tools.append(StructuredTool.from_function(
+        func=plugin_tools.search_plugins,
+        name='search_plugins',
+        description='搜索QGIS官方插件仓库（plugins.qgis.org）。按关键词、分类过滤，返回匹配的插件列表（含名称、版本、描述、下载量、评分等）。用于发现用户需要的插件。',
+        handle_tool_error=True,
+    ))
+
+    tools.append(StructuredTool.from_function(
+        func=plugin_tools.get_plugin_info,
+        name='get_plugin_info',
+        description='获取指定QGIS插件的详细信息（版本、作者、描述、兼容性、下载链接等）。需要提供插件名称。',
+        handle_tool_error=True,
+    ))
+
+    tools.append(StructuredTool.from_function(
+        func=plugin_tools.install_plugin,
+        name='install_plugin',
+        description='从官方仓库下载并安装指定QGIS插件。安装后自动启用。需要提供插件名称（如"QuickOSM"、"latlontools"等）。',
+        handle_tool_error=True,
+    ))
+
+    tools.append(StructuredTool.from_function(
+        func=plugin_tools.uninstall_plugin,
+        name='uninstall_plugin',
+        description='卸载指定的QGIS插件。需要提供插件名称。',
+        handle_tool_error=True,
+    ))
+
+    tools.append(StructuredTool.from_function(
+        func=plugin_tools.enable_plugin,
+        name='enable_plugin',
+        description='启用已安装但未激活的QGIS插件。需要提供插件名称。',
+        handle_tool_error=True,
+    ))
+
+    tools.append(StructuredTool.from_function(
+        func=plugin_tools.disable_plugin,
+        name='disable_plugin',
+        description='禁用已启用的QGIS插件。需要提供插件名称。',
+        handle_tool_error=True,
+    ))
+
+    tools.append(StructuredTool.from_function(
+        func=plugin_tools.call_plugin_method,
+        name='call_plugin_method',
+        description='调用已启用插件实例上的指定方法。用于自动调用插件暴露的公开API。需要提供插件名称和方法名。',
+        handle_tool_error=True,
+    ))
+
     tools.append(StructuredTool.from_function(
         func=plugin_tools.list_installed_plugins,
         name='list_installed_plugins',
-        description='列出当前QGIS中所有已安装的插件信息。',
+        description='列出当前QGIS中所有已安装的插件信息（含版本、作者、启用状态等metadata详情）。',
         handle_tool_error=True,
     ))
 
@@ -393,6 +442,21 @@ def create_qgis_tools(qgis_bridge, iface) -> List[BaseTool]:
         func=plugin_tools.execute_python_code,
         name='execute_python_code',
         description='执行自定义Python代码（通过QGIS API）。这是最强大的工具——可以编写任意Python脚本来操作QGIS的全部功能。代码中可访问QgsApplication、QgsProject、QgsVectorLayer等所有QGIS类以及iface对象。',
+        handle_tool_error=True,
+    ))
+
+    # === 计划控制工具 ===
+    tools.append(StructuredTool.from_function(
+        func=plugin_tools.pause_plan,
+        name='pause_plan',
+        description='暂停当前任务计划的执行。当遇到需要用户确认或无法继续的情况时调用。',
+        handle_tool_error=True,
+    ))
+
+    tools.append(StructuredTool.from_function(
+        func=plugin_tools.skip_step,
+        name='skip_step',
+        description='跳过当前任务计划中正在执行的步骤。当某步骤无法完成或不必要时调用。',
         handle_tool_error=True,
     ))
 

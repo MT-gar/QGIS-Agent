@@ -84,6 +84,35 @@ class TaskPlan:
                     s.error = error
                 break
 
+    def advance_to_next(self) -> Optional[PlanStep]:
+        """
+        将当前 running 步骤标记为 done，返回下一个 pending 步骤。
+        如果没有更多步骤，返回 None。
+        """
+        # 标记当前 running 为 done
+        for s in self.steps:
+            if s.status == 'running':
+                s.status = 'done'
+                break
+        # 返回下一个 pending
+        return self.current_step()
+
+    def skip_current(self, reason: str = '') -> Optional[PlanStep]:
+        """
+        跳过当前 pending/running 步骤，返回下一个。
+        """
+        for s in self.steps:
+            if s.status in ('pending', 'running'):
+                s.status = 'skipped'
+                if reason:
+                    s.result_summary = f'跳过: {reason}'
+                break
+        return self.current_step()
+
+    def has_pending(self) -> bool:
+        """是否有待执行的步骤。"""
+        return any(s.status in ('pending', 'running') for s in self.steps)
+
     def is_complete(self) -> bool:
         """所有步骤是否都已完成（done 或 skipped）。"""
         return all(s.status in ('done', 'skipped') for s in self.steps)

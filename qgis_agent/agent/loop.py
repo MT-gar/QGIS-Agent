@@ -27,6 +27,14 @@ from .safety import create_safety_guard
 from .context_manager import SmartContextManager
 from .planner import GoalPlanner, TaskPlan
 
+# 版本兼容性
+try:
+    from .compat import safe_process_events, safe_sleep_ms, get_version_info
+except ImportError:
+    safe_process_events = lambda: None
+    safe_sleep_ms = lambda ms: None
+    get_version_info = lambda: {}
+
 
 # 单次任务最多的工具调用步数（防止 LLM 陷入死循环）
 MAX_ITERATIONS = 20
@@ -150,13 +158,8 @@ class QGisAgentLoop:
         while self._paused:
             if self._cancelled:
                 return '任务已被用户取消。'
-            try:
-                from qgis.PyQt.QtWidgets import QApplication
-                QApplication.processEvents()
-            except Exception:
-                pass
-            import time
-            time.sleep(0.1)  # 避免忙等吃满 CPU
+            safe_process_events()
+            safe_sleep_ms(100)  # 避免忙等吃满 CPU
 
         # request_cancel() 会同时清除 _paused，导致 while 循环退出；
         # 此处再次检查 _cancelled，确保取消信号不被丢失。
@@ -234,10 +237,38 @@ class QGisAgentLoop:
                 tools=self.openai_tools,
             )
 
-            # 没有工具调用 → 任务完成，返回文本
+            # 没有工具调用 → 检查是否还有待执行的计划步骤
             if not tool_calls:
                 final = content or ''
                 self.messages.append({'role': 'assistant', 'content': final})
+
+                # 如果计划中还有 pending 步骤，注入继续指令而非退出
+                if self.current_plan and self.current_plan.has_pending():
+                    # 标记当前步骤完成
+                    self.current_plan.advance_to_next()
+                    # 进度回调
+                    if progress_cb:
+                        done_count = sum(
+                            1 for s in self.current_plan.steps if s.status == 'done'
+                        )
+                        progress_cb(
+                            f'继续执行计划…',
+                            done_count,
+                            len(self.current_plan.steps),
+                        )
+                    # 注入继续指令，让 LLM 执行下一步
+                    next_step = self.current_plan.current_step()
+                    if next_step:
+                        self.messages.append({
+                            'role': 'user',
+                            'content': (
+                                f'请继续执行任务计划的下一步：\n'
+                                f'{self.current_plan.to_display_text()}'
+                            ),
+                        })
+                        continue  # 继续循环，不退出
+
+                # 计划全部完成或无计划，正常退出
                 if self.current_plan:
                     self.current_plan.status = 'completed'
                     for s in self.current_plan.steps:
@@ -257,6 +288,28 @@ class QGisAgentLoop:
 
             # 逐个执行工具调用，把结果作为 role=tool 消息回灌
             for tc, call_id in zip(tool_calls, self._call_ids(assistant_msg)):
+                # 特殊工具：计划控制
+                if tc.name == 'pause_plan':
+                    self._paused = True
+                    reason = tc.args.get('reason', '用户请求暂停')
+                    result_text = f'任务计划已暂停。原因: {reason}'
+                    self.messages.append({
+                        'role': 'tool', 'tool_call_id': call_id,
+                        'content': result_text,
+                    })
+                    continue
+
+                if tc.name == 'skip_step':
+                    reason = tc.args.get('reason', '')
+                    if self.current_plan:
+                        self.current_plan.skip_current(reason)
+                    result_text = f'已跳过当前步骤。{("原因: " + reason) if reason else ""}'
+                    self.messages.append({
+                        'role': 'tool', 'tool_call_id': call_id,
+                        'content': result_text,
+                    })
+                    continue
+
                 # 重复调用检测：同一 (工具名+参数) 重复过多次，判定为死循环。
                 sig = self._call_signature(tc)
                 call_counts[sig] = call_counts.get(sig, 0) + 1
@@ -507,6 +560,13 @@ class QGisAgentLoop:
             '但不要对同一目标反复重试完全相同的调用，换思路或如实说明失败原因。',
             '5. 用最少的工具调用完成任务，最终结果用中文清晰呈现。',
             '',
+            '多步骤任务计划：',
+            '- 当用户需求包含多个步骤时，系统会自动为你生成任务计划。',
+            '- 每完成一个步骤后，系统会自动提示你继续执行下一步。',
+            '- 请按照计划逐步执行，直到所有步骤完成。',
+            '- 如果某步骤无法完成，调用 skip_step 跳过并说明原因。',
+            '- 如果需要用户确认，调用 pause_plan 暂停。',
+            '',
             '重要：优先使用上面列出的专用工具，不要用 execute_python_code 代替。',
             'execute_python_code 是最后手段，每次调用都会弹窗打断用户、需手动确认，'
             '只有在没有任何合适专用工具时才使用。',
@@ -515,5 +575,7 @@ class QGisAgentLoop:
             '或用 calculate_field 把结果写入新字段（field_type 用 "double"）。',
             '- 字段统计（求和/均值/最值）：用 field_statistics。',
             '- 空间分析（缓冲区/裁剪/相交等）：用 run_algorithm 调 Processing 算法。',
+            '- 查找/安装插件：用 search_plugins 搜索，用 install_plugin 安装。',
+            '- 调用插件功能：用 call_plugin_method 调用已启用插件的方法。',
         ]
         return '\n'.join(lines)

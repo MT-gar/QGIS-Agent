@@ -24,7 +24,13 @@ from qgis.PyQt.QtWidgets import (
     QGroupBox, QMessageBox, QApplication,
 )
 from qgis.PyQt.QtGui import QTextCursor
-from qgis.PyQt.QtCore import pyqtSignal
+from qgis.PyQt.QtCore import pyqtSignal, QTimer
+
+# 版本兼容性
+try:
+    from ..compat import safe_process_events
+except ImportError:
+    safe_process_events = lambda: None
 from qgis.gui import QgsDockWidget
 
 
@@ -236,7 +242,7 @@ class ChatPanel(QgsDockWidget):
         if self.agent.is_paused():
             self.agent.request_resume()
         self._append_message('system', '思考中…')
-        QApplication.processEvents()
+        safe_process_events()
 
         try:
             # 进度回调：更新任务树和进度标签
@@ -267,9 +273,15 @@ class ChatPanel(QgsDockWidget):
             self._append_message('error', f'Agent 执行出错: {e}')
         finally:
             self._set_busy(False)
-            # 隐藏任务树（延迟，让用户看到最终状态）
-            if hasattr(self, 'task_tree'):
-                self.task_tree.clear()
+            # 任务树：仅在计划真正完成时延迟清理，出错或取消时保留供用户查看
+            if hasattr(self, 'task_tree') and self.agent:
+                plan = self.agent.current_plan
+                if plan and plan.is_complete():
+                    # 完成后延迟 5 秒清理，让用户看到最终状态
+                    QTimer.singleShot(5000, self.task_tree.clear)
+                elif plan and plan.has_failure():
+                    # 有失败步骤，保留任务树不清理
+                    pass
 
     def _set_busy(self, busy: bool):
         """切换忙碌状态：禁用/启用输入控件，显示/隐藏暂停和停止按钮。"""
@@ -278,7 +290,7 @@ class ChatPanel(QgsDockWidget):
         self.pause_button.setVisible(busy)
         self.stop_button.setVisible(busy)
         self.pause_button.setText('暂停')  # 重置按钮文本
-        QApplication.processEvents()
+        safe_process_events()
 
     def _toggle_pause(self):
         """切换暂停/恢复状态。"""
