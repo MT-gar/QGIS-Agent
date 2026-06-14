@@ -1,8 +1,9 @@
 [general]
 name=QGIS Agent
 description=AI agent plugin that enables natural language control of all QGIS features through a chat panel. Supports layers, processing algorithms, editing, layouts, plugin management, and more.
-version=0.2.0
+version=0.2.1
 qgisMinimumVersion=3.44
+qgisMaximumVersion=4.99
 author=MT
 email=MT_dev@163.com
 about=A chat-panel AI agent for QGIS. Requires the Python packages langchain, langchain-core and litellm (or openai) to be installed into the QGIS Python environment.

@@ -362,6 +362,8 @@ class ChatPanel(QgsDockWidget):
             # 创建 LLM 客户端
             provider = self.provider_combo.currentText()
             model = self.model_input.text() or 'gpt-4o'
+            # 修复 Windows 路径分隔符问题：litellm 要求正斜杠
+            model = model.replace('\\', '/')
             api_key = self.api_key_input.text()
             base_url = self.base_url_input.text().strip() or None
 
