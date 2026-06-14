@@ -4,7 +4,7 @@
 
 **用自然语言驱动 QGIS —— AI Agent 插件**
 
-[![QGIS](https://img.shields.io/badge/QGIS-4.0+-5B9A3D?style=for-the-badge&logo=qgis&logoColor=white)](https://qgis.org)
+[![QGIS](https://img.shields.io/badge/QGIS-3.44+-5B9A3D?style=for-the-badge&logo=qgis&logoColor=white)](https://qgis.org)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0)
 
@@ -31,7 +31,7 @@ Agent：好的，我来分步完成：
 | 能力 | 说明 |
 |------|------|
 | **自然语言交互** | 在聊天面板中用日常语言描述任务，Agent 自动规划和执行 |
-| **35+ 内置工具** | 涵盖图层管理、空间分析、要素编辑、表达式计算、网络服务、打印布局等 |
+| **40+ 内置工具** | 涵盖图层管理、空间分析、要素编辑、表达式计算、网络服务、打印布局、插件管理等 |
 | **Processing 算法** | 直接调用 QGIS 全部 Processing 算法（GDAL、GRASS、SAGA、原生） |
 | **QGIS API 桥接** | 自动发现 qgis.core（1400+ 类）和 qgis.gui（700+ 类），支持链式调用 |
 | **多 LLM 后端** | 支持 OpenAI、Anthropic、Ollama（本地模型），通过 litellm 统一接口 |
@@ -45,7 +45,7 @@ Agent：好的，我来分步完成：
 
 ### 前置条件
 
-- QGIS 4.0+
+- QGIS 3.44+
 - Python 3.10+（QGIS 自带）
 - LLM API Key（OpenAI / Anthropic）或本地 Ollama
 
@@ -156,11 +156,15 @@ qgis_agent/
 ├── agent/
 │   ├── loop.py              # Agent 核心循环（工具调用驱动）
 │   ├── client.py            # LLM 客户端（OpenAI/Anthropic/Ollama）
-│   ├── provider.py          # 工具注册工厂（35+ 工具）
+│   ├── provider.py          # 工具注册工厂（40+ 工具）
 │   ├── session.py           # 会话管理（多会话 + 持久化）
 │   ├── safety.py            # 安全控制（确认/限流/日志）
+│   ├── compat.py            # QGIS 版本兼容性层（3.44+）
+│   ├── context_manager.py   # 智能上下文管理器
+│   ├── planner.py           # 目标规划器（任务拆解）
 │   ├── chat/
 │   │   ├── chat_panel.py    # 聊天 UI 面板
+│   │   ├── task_tree_widget.py  # 任务计划进度树
 │   │   └── message_renderer.py  # 消息格式化
 │   └── tools/
 │       ├── qgis_bridge.py   # QGIS API 通用桥接器
@@ -171,7 +175,7 @@ qgis_agent/
 │       ├── expression_tools.py   # 表达式与字段计算（4 个）
 │       ├── raster_tools.py  # 栅格操作
 │       ├── network_tools.py # 网络服务（5 个）
-│       ├── plugin_tools.py  # 插件集成 + Python 代码执行
+│       ├── plugin_tools.py  # 插件管理 + Python 代码执行
 │       └── layout_tools.py  # 打印布局
 └── icons/
     └── agent.svg
@@ -317,7 +321,24 @@ ollama pull llama3.1
 </details>
 
 <details>
-<summary><b>其他工具（7 个）</b> — API 桥接、代码执行、栅格、布局</summary>
+<summary><b>插件管理工具（9 个）</b> — 搜索、安装、启用、调用</summary>
+
+| 工具 | 说明 |
+|------|------|
+| `search_plugins` | 搜索 QGIS 官方插件仓库 |
+| `get_plugin_info` | 获取插件详细信息 |
+| `install_plugin` | 下载并安装插件 |
+| `uninstall_plugin` | 卸载插件 |
+| `enable_plugin` | 启用已安装插件 |
+| `disable_plugin` | 禁用插件 |
+| `call_plugin_method` | 调用插件方法 |
+| `list_installed_plugins` | 列出已安装插件（含 metadata） |
+| `pause_plan` / `skip_step` | 任务计划控制 |
+
+</details>
+
+<details>
+<summary><b>其他工具（6 个）</b> — API 桥接、代码执行、栅格、布局</summary>
 
 | 工具 | 说明 |
 |------|------|
@@ -327,13 +348,33 @@ ollama pull llama3.1
 | `execute_python_code` | 执行 Python 代码 |
 | `format_table` | 格式化表格输出 |
 | `get_raster_stats` | 栅格统计 |
-| `list_installed_plugins` | 列出已安装插件 |
 
 </details>
 
 ---
 
 ## 📝 更新日志
+
+### v0.2.0 (2026-06-14)
+
+**插件智能发现与安装**
+- 新增 `search_plugins` 搜索 QGIS 官方插件仓库（plugins.qgis.org）
+- 新增 `install_plugin` 下载并安装插件（自动解压、注册、启用）
+- 新增 `enable_plugin` / `disable_plugin` 启用禁用已安装插件
+- 新增 `call_plugin_method` 调用插件暴露的公开 API
+- 增强 `list_installed_plugins` 显示 metadata 详情（版本、作者、分类等）
+
+**任务计划持续执行**
+- 修复任务拆解后单步完成即停止的问题，支持多步骤自动续行
+- 新增 `pause_plan` / `skip_step` 控制工具供 LLM 显式控制计划
+- 任务树在计划完成时延迟清理，失败时保留供用户查看
+- 系统提示词增加多步骤计划处理指导
+
+**QGIS 3.44 兼容性**
+- 新增 `agent/compat.py` 版本兼容性层
+- `qgisMinimumVersion` 从 4.0 降为 3.44
+- 版本检测、特性检测、兼容性包装函数
+- 所有 QGIS API 调用改用兼容性函数
 
 ### v0.1.2 (2026-06-14)
 
